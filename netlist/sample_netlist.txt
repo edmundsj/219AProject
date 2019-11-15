@@ -1,0 +1,73 @@
+# NETLIST v1:
+# Date Created: 11/23/2019
+# Author: Jordan Edmunds, jordan.e@berkeley.edu
+
+# This is a sample netlist, which is parsed by the python interpreter
+# Lines starting with a pound sign are ignored, just like in python.
+
+# There is one mandatory plane, the 'object' plane. This plane contains
+# the 'input' electromagnetic field. This might be a simple plane wave,
+# a Gaussian beam,
+
+# This netlist is modeled after the SPICE netlists used in circuit analysis.
+# The reason for this is that it is extremely simple and highly extensible.
+# The goal is to define your elements and basic geometries in this netlist,
+# without needing to know the underlying representation of the code.
+
+# This will allow even total amateurs to python to use this software, as it
+# requires only that you interact with (write) the netlist, and then run
+# the software using the netlist as an input.
+
+# Instead of 'nodes', as in circuit analysis, we have 'planes'. These
+# are conceptually identical to nodes in a circuit, and are just
+# cartesian x/y planes.
+
+# The format of components is this:
+# <letter><name> <n1> <n2> [model_name] [parameter_values]
+
+# All units are assumed to be in millimeters if not given, or SI units
+# if a prefix is given explicitly.
+
+# For now, we will deal only with thin elements, or elements that
+# can be compressed into a single 2D complex amplitude/phase mask.
+# These need not be axi-symmetric so long as they are functions of only
+# x and y.
+
+# Example: a thin fresnel lens placed at some plane (plane 1)
+# Everything is assumed to start at the coordinate z=0, and all element
+# locations are defined relative to this origin. Elements cannot be at 
+# negative locations. There is always a plane (plane 0, or P0)
+
+# First (although we can put this wherever we want), we define our source:
+# W: Plane wave
+# All we need is a wavelength and a location for a plane wave.
+# In the future we will add tilt as an option to the plane wave and gaussian beams.
+W1 0mm 500nm
+
+# P0 0mm	# Plane 0 - located at z=0mm
+# P1 20mm 	# Plane 1 - located at z=20mm
+P1 1000mm		# Plane 2 - located at z=60mm
+P2 10000mm	
+P3 100000mm
+P4 1000000mm	
+P5 10000000mm
+
+# G: Gaussian beam
+# This requires a position, wavelength, and beam waist in that order.
+# Gaussian beam of 700nm wavelength located at z=0mm with a waist w0=5mm
+# G1 0mm 700nm 5mm # Gaussian beam located at 0mm with a 5mm waist
+
+# L: Ideal (quadratic phase) lens
+# L1 20mm 40mm	# Lens 1 - located at z=20mm, with a focal length of 40mm.
+
+# C: Circular aperture
+# C<name> <location> <diameter>
+#C1 0.1mm 1mm
+
+# R: Rectangular aperture
+# R<name> <location> <width_x> <width_y>
+# R1 0.1mm 1mm
+
+# S: Square aperture
+# S<name> <location> <width>
+S1 0mm 100mm

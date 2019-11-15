@@ -11,85 +11,163 @@
 # 2. Add impulse-response based fresnel propagator
 # 3. Add warnings if the source (the majority of the intensity) does not *fit* within
 # the aperture (L > 2-3*Dsource). 
+# 4. Choose the field sampling so we appropriately oversample our stuff and don't alias anything.
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 class Mask:
-    def __init__(self, ident, location, source, phaseFunction=None, intensityFunction=None,
-                realFunction=None, imaginaryFunction=None,
-                phaseValues=None, intensityValues=None,
-                realValues=None, imaginaryValues=None):
+    """
+    The main class from which everything inherits. Represents a two-dimensional
+    complex-valued 'mask' to be applied to the electromagnetic field.
+    """
+    def __init__(self, ident, location, phaseFunction=None, amplitudeFunction=None,
+            realFunction=None, imaginaryFunction=None, complex_values = None):
 
         self.z = location;
         self.ident = ident;
-        self.source = source;
         self.phaseFunction = phaseFunction;
-        self.intensityFunction = intensityFunction;
-
+        self.amplitudeFunction = amplitudeFunction;
         self.realFunction = realFunction;
         self.imaginaryFuunction = imaginaryFunction;
-        self.phaseValues = phaseValues;
-        self.intensityValues = intensityValues;
-        self.realValues = realValues;
-        self.imaginaryValues = imaginaryValues;
 
-    source = False; # Is this field a source or not? (does it violate conservation of energy)
-    ident = ''; # The unique identifier for this field.
-    z = 0; # Location along the optical axis of our field
-    phaseFunction = 0; # function describing the phase of our optical field
-    intensityFunction = 1; # function describing the intensity of our optical field.
+        self.complex_values =  complex_values;
+
+    ident = '';
+    z = 0;
+    Lx = 0;
+    Ly = 0;
+    phaseFunction = None; # The function of x,y,l which determines the phase
+    amplitudeFunction = None; # The function of x, y, l which determines the amplitude
     realFunction = None;
     imaginaryFunction = None;
-    phaseValues = None;
-    intensityValues = None;
-    realValues = None;
-    imaginaryValues = None;
+
+    complex_values = np.array([]); # Raw complex values for the mask (a 2D array)
+
+    def complexFunction(self, x, y, l):
+        """ Return a complex-valued function depending on whether we have
+        defined a real/imaginary function, amplitude/phase function, or real/imaginary values.
+        """
+        if(self.realFunction == None and self.imaginaryFunction == None
+                and self.amplitudeFunction != None and self.phaseFunction != None):
+            return self.amplitudeFunction(x,y,l)*np.exp(1j*self.phaseFunction(x,y,l))
+        elif(self.amplitudeFunction == None and self.phaseFunction == None and
+                self.realFunction != None and self.imaginaryFunction != None):
+            return self.realFunction(x,y,l) + 1j*self.imaginaryFunction(x,y,l);
+        else:
+            return None;
+
+    def plotMagPhase(self, title=''):
+        """
+        Plots the magnitude and phase of the electromagnetic field object
+        """
+        if(self.complex_values.size > 0):
+            fig, (ax1, ax2) = plt.subplots(nrows=1,ncols=2,figsize=(7,7))
+            ax1.set_xlabel('x(mm)')
+            ax1.set_ylabel('y(mm)')
+            ax1.set_title('Intensity');
+
+            ax2.set_xlabel('x(mm)')
+            ax2.set_ylabel('y(mm)')
+            ax2.set_title('Phase');
+
+
+            if(self.Lx != 0 and self.Ly != 0):
+                amp = ax1.imshow(np.square(np.square(np.abs(self.complex_values))),
+                        extent=[-self.Lx/2,self.Lx/2,-self.Ly/2,self.Ly/2])
+                phase = ax2.imshow(np.angle(self.complex_values),
+                        extent=[-self.Lx/2,self.Lx/2,-self.Ly/2,self.Ly/2])
+            else:
+                amp = ax1.imshow(np.square(np.square(np.abs(self.complex_values)))) 
+                phase = ax2.imshow(np.angle(self.complex_values));
+
+            fig.colorbar(amp, ax=ax1)
+            fig.colorbar(phase, ax=ax2)
+            fig.suptitle(title);
+
+    def saveValues(self, filename):
+        """
+        Prints the complex-valued field to a file with filename "filename".
+        """
+        np.savetxt(filename, self.complex_values);
+
+
 
 # This is just a container for our complex-valued field at a particular location.
-class Field:
-    def __init__(self, ident, loc, size_x, size_y, size_x_mm, size_y_mm):
+# For now, it has a well-defined wavelength.
+class Field(Mask):
+    def __init__(self, ident, loc, wavelength, phaseFunction, amplitudeFunction):
         self.ident = ident;
-        self.complexValues = np.zeros((size_y, size_x));
         self.z = loc;
-        self.Lx = size_x_mm;
-        self.Ly = size_y_mm;
+        self.wavelength = wavelength;
+        self.phaseFunction = phaseFunction;
+        self.amplitudeFunction = amplitudeFunction;
 
-    complexValues = None; # The array of complex-valued fields
-    z = 0; # Current z-location of the field
-    ident = ''; # String identifier for this field.
-    Lx = 0; # Physical size along the x dimension
-    Ly = 0; # Physical size along the y dimension
+    wavelength = 0; # Wavelength of the monochromatic field.
 
-    def fresnelPropagate(self, wavelength, distance):
+
+    def fresnelPropagate(self, distance):
         """Propagate an electromagnetic field from one location to another using the Fresnel
         u1: Electromagnetic field to propagate at some initial plane
         L: side length of both the initial and final plane, in mm
         z: distance to propagate the field, in mm
         """
-        k0 = 2*np.pi/wavelength;
-        field_shape = self.complexValues.shape;
+        if(distance > 0):
+            field_shape = self.complex_values.shape;
+            print(f"field shape is {field_shape}")
+            k0 = 2*np.pi / self.wavelength;
 
-        new_field = np.zeros(field_shape);
-        M = field_shape[0];
-        N = field_shape[1];
+            M = field_shape[0];
+            N = field_shape[1];
+            dx = self.Lx/N;
+            dy = self.Ly/M;
 
-        dx = L/N;
-        dy = L/M;
+            print(f"dx: {dx}, dy: {dy}");
 
-        # These are the frequencies we can represent on our discretized grid.
-        # They are the 'available' frequency bins we will shove stuff into.
-        fx = np.linspace(-1/(2*dx),1/(2*dx),M)
-        fy = np.linspace(-1/(2*dy),1/(2*dy),N)
+            # This is our oversampling ratio for the transfer function propagator.
+            # ideally, we want this to be much greater than one for appropriate sampling
+            # of our phase function. We want this number to be much greater than 1.
 
-        # This turns our frequencies into a 2D grid for 2-dimensional 
-        # fourier transformation.
-        (FX,FY) = np.meshgrid(fx, fy);
+            # These are the frequencies we can represent on our discretized grid.
+            # They are the 'available' frequency bins we will shove stuff into.
+            # FX, FY turns our frequencies into a 2D grid for 2-dimensional 
+            # fourier transformation.
+            fx = np.linspace(-1/(2*dx),1/(2*dx),M)
+            fy = np.linspace(-1/(2*dy),1/(2*dy),N)
+            (FX,FY) = np.meshgrid(fx, fy);
 
-        # Fresnel transfer function
-        H = np.exp(-1j*np.pi*wavelength*z*(np.square(FX)+np.square(FY)));
+            # Fresnel transfer function
+            H = np.exp(-1j*np.pi*self.wavelength*distance*(np.square(FX) + np.square(FY)));
 
-        # Not sure why this 'fftshift' stuff is necessary.
-        H = np.fft.fftshift(H); # shift the transfer function in frequency
-        U1 = np.fft.fft2(np.fft.fftshift(self.complexValues))
-        U2 = H*U1; # Compute the fourier transform of our new field.
-        self.complexValues = np.fft.ifftshift(np.fft.ifft2(U2)); # compute our final electromagnetic field
+            # Not sure why this 'fftshift' stuff is necessary.
+            H = np.fft.fftshift(H); # shift the transfer function in frequency
+            U1 = np.fft.fft2(np.fft.fftshift(self.complex_values))
+            U2 = H*U1; # Compute the fourier transform of our new field.
+
+            # update our complex values
+            self.complex_values = np.fft.ifftshift(np.fft.ifft2(U2)); # compute our final electromagnetic field
+            self.z += distance;
+
+            print(self.wavelength);
+            oversampling_ratio = dx * self.Lx / self.wavelength / distance;
+            return oversampling_ratio;
+        else:
+            return 0;
+
+def circ(diameter, x,y):
+    """
+    Function that returns 1 if the coordinates x, y are within the radius of the circle
+    """
+    return np.heaviside(diameter/2 - np.sqrt(np.square(x) + np.square(y)),1);
+
+def rect(width, height, x, y):
+    """
+    Function that returns 1 if the coordinates x, y are within the rectangle.
+    """
+    return np.heaviside(width/2 - np.abs(x), 1)*np.heaviside(height/2 - np.abs(y), 1);
+
+def sq(width, x, y):
+    """
+    Function that returns 1 if the coordinates x, y are within the square
+    """
+    return rect(width, width, x, y);
