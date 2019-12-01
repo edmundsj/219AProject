@@ -89,6 +89,7 @@
 #   the utilities I have written to load in the results of your simulation and plot them, be my guest.
 
 import numpy as np
+import sys
 from core.fields import *
 from netlist.netlist_parser import *
 import matplotlib.pyplot as plt
@@ -96,8 +97,15 @@ import matplotlib.pyplot as plt
 # 1. The class NetlistParser parses a netlist and turns everything into a "Mask" or "Field" object.
 # The masks and field are returned so that they are sorted in ascending order with
 # respect to their coordinate on the optical axis.
+arguments = len(sys.argv) - 1; # The number of arguments
+netlist_location = './netlist/sample_netlist.txt';
+print(arguments);
+print(sys.argv);
+if(arguments > 0):
+    print(f"Using user defined netlist {sys.argv[1]}")
+    netlist_location = sys.argv[1];
 print("Parsing netlist... ");
-parser = NetlistParser('./netlist/sample_netlist.txt');
+parser = NetlistParser(netlist_location);
 [masks, fields] = parser.parseNetlist();
 print("Parsing complete !");
 

@@ -1,0 +1,8 @@
+Berkeley Diffraction Engine (EECS 219A Final Project)
+
+The goal of this project is to compute the propagation of optical-frequency electromagnetic fields through free space, apertures, and objects of arbitrary 3D geometry. It is currently based on the paraxial approximation to the Helmholtz wave equation, and uses transfer-function based techniques to compute the diffracted field (using the Fourier Transform).
+
+This project aims to make computing diffraction quantities accessible to anyone capable of writing a text file - for this reason it uses SPICE netlist-based input. You simply write a netlist file placed in the 'netlist' folder, and call the program with the netlist as an argument. For example, if you want to run the program with a netlist called "test_netlist.txt", you would execute:
+	$ python3 main.py "netlist/my_netlist.txt"
+
+By default, if you just run main.py, it will run with a sample netlist, which contains the syntax you can use. The goal of the netlist structure is to make everything as simple as possible. A functional netlist only needs to be a single line, which defines your excitation source. If you want to propagate this source by some distance, that adds another line. For each aperture/mask, you add another line. See the sample netlist in the 'netlist' folder for all available sources, apertures, etc.
